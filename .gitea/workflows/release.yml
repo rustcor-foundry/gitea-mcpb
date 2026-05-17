@@ -18,29 +18,42 @@ concurrency:
 jobs:
   # ---------------------------------------------------------------------------
   # 1. Fetch upstream binaries (linux runner; bash + curl + standard tools).
+  #
+  # Versioning has two axes:
+  #   - upstream_version: the gitea-mcp release we wrap. Read from
+  #     manifest.json. Must match a real upstream release tag.
+  #   - bundle_version: our release tag (may include pre-release suffix like
+  #     -rc1 or build metadata like +pkg.1). Used only in artifact filenames
+  #     and in the substituted manifest version field.
   # ---------------------------------------------------------------------------
   fetch-upstream:
     runs-on: [self-hosted, linux]
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      upstream_version: ${{ steps.version.outputs.upstream_version }}
+      bundle_version:   ${{ steps.version.outputs.bundle_version }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve version (from tag or workflow input)
+      - name: Resolve versions
         id: version
         run: |
+          # upstream version from manifest (source of truth)
+          UPSTREAM="$(python3 -c 'import json; print(json.load(open("manifest.json"))["version"])')"
+          # bundle version from tag (or workflow_dispatch input for manual runs)
           if [ -n "${{ inputs.version }}" ]; then
-            V="${{ inputs.version }}"
+            BUNDLE="${{ inputs.version }}"
           else
-            V="${GITHUB_REF_NAME#v}"
+            BUNDLE="${GITHUB_REF_NAME#v}"
           fi
-          echo "version=$V" >> "$GITHUB_OUTPUT"
-          echo "==> resolved version: $V"
+          echo "upstream_version=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          echo "bundle_version=$BUNDLE"     >> "$GITHUB_OUTPUT"
+          echo "==> upstream: $UPSTREAM"
+          echo "==> bundle:   $BUNDLE"
 
       - name: Fetch + verify upstream binaries
         run: |
           chmod +x scripts/fetch-upstream.sh
-          ./scripts/fetch-upstream.sh "${{ steps.version.outputs.version }}"
+          ./scripts/fetch-upstream.sh "${{ steps.version.outputs.upstream_version }}"
 
       - name: Upload upstream binaries as artifact
         uses: actions/upload-artifact@v4
@@ -61,7 +74,7 @@ jobs:
       - name: Build from source
         run: |
           chmod +x scripts/build-from-source-freebsd.sh
-          ./scripts/build-from-source-freebsd.sh "${{ needs.fetch-upstream.outputs.version }}"
+          ./scripts/build-from-source-freebsd.sh "${{ needs.fetch-upstream.outputs.upstream_version }}"
 
       - name: Upload freebsd binary as artifact
         uses: actions/upload-artifact@v4
@@ -165,7 +178,7 @@ jobs:
       - name: Build all bundles
         run: |
           chmod +x scripts/build-bundle.sh
-          ./scripts/build-bundle.sh "${{ needs.fetch-upstream.outputs.version }}"
+          ./scripts/build-bundle.sh "${{ needs.fetch-upstream.outputs.bundle_version }}"
 
       - name: Upload bundles as artifact
         uses: actions/upload-artifact@v4
@@ -189,13 +202,24 @@ jobs:
           name: mcpb-bundles
           path: dist/
 
+      - name: Detect prerelease (anything after a dash or plus is prerelease)
+        id: prerel
+        run: |
+          TAG="${{ github.ref_name }}"
+          case "$TAG" in
+            *-*|*+*) echo "is_prerelease=true"  >> "$GITHUB_OUTPUT" ;;
+            *)       echo "is_prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          esac
+
       - name: Create release and attach bundles
         env:
           GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITEA_HOST: ${{ github.server_url }}
           REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-          VERSION: ${{ needs.fetch-upstream.outputs.version }}
+          UPSTREAM: ${{ needs.fetch-upstream.outputs.upstream_version }}
+          BUNDLE:   ${{ needs.fetch-upstream.outputs.bundle_version }}
+          PRERELEASE: ${{ steps.prerel.outputs.is_prerelease }}
         run: |
           set -euo pipefail
           # Create the release
@@ -203,12 +227,15 @@ jobs:
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
             "$GITEA_HOST/api/v1/repos/$REPO/releases" \
-            -d "$(jq -n --arg tag "$TAG" --arg name "gitea-mcpb $TAG" \
-                      --arg body "Wraps upstream gitea-mcp v$VERSION. See README for install paths." \
-                      '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:false}')" \
+            -d "$(jq -n \
+                    --arg tag "$TAG" \
+                    --arg name "gitea-mcpb $TAG" \
+                    --arg body "Wraps upstream gitea-mcp v$UPSTREAM. Bundle version $BUNDLE. See README for install paths." \
+                    --argjson prerelease "$PRERELEASE" \
+                    '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:$prerelease}')" \
             > release.json
           RELEASE_ID="$(jq -r '.id' release.json)"
-          echo "==> created release id=$RELEASE_ID"
+          echo "==> created release id=$RELEASE_ID (prerelease=$PRERELEASE)"
 
           # Attach each artifact
           for f in dist/*; do
