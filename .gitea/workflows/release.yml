@@ -10,10 +10,11 @@ on:
         required: true
         default: "1.3.0"
 
-# Concurrency: don't run two release builds for the same tag in parallel.
+# Concurrency: re-tagging cancels any prior in-flight run for the same ref.
+# (Useful during iteration; stale queued runs won't pile up on stuck runners.)
 concurrency:
   group: release-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 # TLS shortcut: the W-Sky CA isn't in the runners' Node trust store, so
 # Node-based actions (upload/download-artifact) fail with "unable to get
@@ -110,82 +111,87 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
-  # 3. Native smoke-test on each platform we have a runner for.
-  #    Skipped platforms (linux-arm64, win-arm64) are shipped unverified.
+  # 3. Native smoke-test per platform.
+  #
+  # Originally a matrix job, but act-runner stringifies `${{ matrix.runs-on }}`
+  # instead of expanding it as a YAML list, so the runner looks for a label
+  # literally named "[self-hosted linux]". Split into one job per platform —
+  # verbose but works on act-runner today.
+  #
+  # Skipped platforms (linux-arm64, win-arm64, freebsd-amd64) ship unverified
+  # until we get runners for them.
   # ---------------------------------------------------------------------------
-  smoke-test:
+  smoke-linux-amd64:
     needs: [fetch-upstream, build-freebsd]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: linux-amd64
-            runs-on: [self-hosted, linux]
-            binary: gitea-mcp
-            shell: bash
-          - target: windows-amd64
-            runs-on: [self-hosted, windows]
-            binary: gitea-mcp.exe
-            shell: pwsh
-          - target: darwin-arm64
-            runs-on: [macos-arm64]
-            binary: gitea-mcp
-            shell: bash
-          - target: darwin-amd64
-            runs-on: [macos-arm64]   # Rosetta — same Mac mini
-            binary: gitea-mcp
-            shell: bash
-          # freebsd-amd64 native smoke-test disabled until bsd-ws01 has Node
-          # installed (JS actions like actions/checkout fail without it).
-          # The freebsd binary still ships in the release, just unverified.
-    runs-on: ${{ matrix.runs-on }}
+    runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
-
-      - name: Download artifact for this platform
-        uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v3
         with:
-          name: ${{ matrix.target == 'freebsd-amd64' && 'upstream-freebsd-amd64' || 'upstream-binaries' }}
+          name: upstream-binaries
           path: ./_artifact
-
-      - name: Locate binary
-        id: locate
-        shell: ${{ matrix.shell }}
+      - name: MCP handshake
         run: |
-          if [ "${{ matrix.shell }}" = "pwsh" ]; then exit 0; fi
-          # bash branch
-          if [ "${{ matrix.target }}" = "freebsd-amd64" ]; then
-            BIN="$(pwd)/_artifact/${{ matrix.binary }}"
-          else
-            BIN="$(pwd)/_artifact/extract-${{ matrix.target }}/${{ matrix.binary }}"
-          fi
+          BIN="$(pwd)/_artifact/extract-linux-amd64/gitea-mcp"
           chmod +x "$BIN"
-          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
+          python3 scripts/smoke-test-mcp.py "$BIN"
 
-      - name: Locate binary (windows)
-        if: matrix.shell == 'pwsh'
+  smoke-windows-amd64:
+    needs: [fetch-upstream, build-freebsd]
+    runs-on: [self-hosted, windows]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: upstream-binaries
+          path: ./_artifact
+      - name: MCP handshake
         shell: pwsh
         run: |
-          $bin = Join-Path (Get-Location) "_artifact\extract-${{ matrix.target }}\${{ matrix.binary }}"
-          echo "bin=$bin" >> $env:GITHUB_OUTPUT
-        id: locate-win
+          $bin = Join-Path (Get-Location) "_artifact\extract-win-amd64\gitea-mcp.exe"
+          python scripts/smoke-test-mcp.py $bin
 
-      - name: Smoke-test (MCP handshake)
-        shell: ${{ matrix.shell }}
+  smoke-darwin-arm64:
+    needs: [fetch-upstream, build-freebsd]
+    runs-on: [macos-arm64]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: upstream-binaries
+          path: ./_artifact
+      - name: MCP handshake
         run: |
-          if [ "${{ matrix.shell }}" = "pwsh" ]; then exit 0; fi
-          python3 scripts/smoke-test-mcp.py "${{ steps.locate.outputs.bin }}"
+          BIN="$(pwd)/_artifact/extract-darwin-arm64/gitea-mcp"
+          chmod +x "$BIN"
+          python3 scripts/smoke-test-mcp.py "$BIN"
 
-      - name: Smoke-test (MCP handshake, windows)
-        if: matrix.shell == 'pwsh'
-        shell: pwsh
-        run: python scripts/smoke-test-mcp.py "${{ steps.locate-win.outputs.bin }}"
+  smoke-darwin-amd64-rosetta:
+    needs: [fetch-upstream, build-freebsd]
+    runs-on: [macos-arm64]  # same Mac mini, runs amd64 via Rosetta
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v3
+        with:
+          name: upstream-binaries
+          path: ./_artifact
+      - name: MCP handshake
+        run: |
+          BIN="$(pwd)/_artifact/extract-darwin-amd64/gitea-mcp"
+          chmod +x "$BIN"
+          python3 scripts/smoke-test-mcp.py "$BIN"
 
   # ---------------------------------------------------------------------------
   # 4. Pack the .mcpb bundle (main + per-arch sidecars).
   # ---------------------------------------------------------------------------
   pack:
-    needs: [fetch-upstream, build-freebsd, smoke-test]
+    needs:
+      - fetch-upstream
+      - build-freebsd
+      - smoke-linux-amd64
+      - smoke-windows-amd64
+      - smoke-darwin-arm64
+      - smoke-darwin-amd64-rosetta
     runs-on: [self-hosted, linux]
     steps:
       - uses: actions/checkout@v4
