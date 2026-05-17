@@ -75,15 +75,29 @@ jobs:
           retention-days: 7
 
   # ---------------------------------------------------------------------------
-  # 2. Build freebsd-amd64 from source (upstream doesn't ship a FreeBSD binary).
+  # 2. Cross-compile freebsd-amd64 from source on the linux runner.
+  #
+  # Upstream doesn't publish a FreeBSD binary. Native build on bsd-ws01 would
+  # be ideal but the FreeBSD runner doesn't have Node (required for any JS
+  # action like actions/checkout). Cross-compile from the linux runner is the
+  # quick fix — Go's GOOS=freebsd GOARCH=amd64 produces a clean static binary
+  # since gitea-mcp doesn't use CGO.
+  #
+  # TODO: once bsd-ws01 has Node installed, move this back to a native build
+  # AND add the freebsd smoke-test back to the matrix below.
   # ---------------------------------------------------------------------------
   build-freebsd:
-    runs-on: [self-hosted, freebsd]
+    runs-on: [self-hosted, linux]
     needs: fetch-upstream
     steps:
       - uses: actions/checkout@v4
 
-      - name: Build from source
+      - name: Ensure Go is available
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Cross-compile from source
         run: |
           chmod +x scripts/build-from-source-freebsd.sh
           ./scripts/build-from-source-freebsd.sh "${{ needs.fetch-upstream.outputs.upstream_version }}"
@@ -121,10 +135,9 @@ jobs:
             runs-on: [macos-arm64]   # Rosetta — same Mac mini
             binary: gitea-mcp
             shell: bash
-          - target: freebsd-amd64
-            runs-on: [self-hosted, freebsd]
-            binary: gitea-mcp
-            shell: bash
+          # freebsd-amd64 native smoke-test disabled until bsd-ws01 has Node
+          # installed (JS actions like actions/checkout fail without it).
+          # The freebsd binary still ships in the release, just unverified.
     runs-on: ${{ matrix.runs-on }}
     steps:
       - uses: actions/checkout@v4
