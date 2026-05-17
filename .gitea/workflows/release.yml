@@ -15,6 +15,18 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+# TLS shortcut: the W-Sky CA isn't in the runners' Node trust store, so
+# Node-based actions (upload/download-artifact) fail with "unable to get
+# local issuer certificate" when talking to gitea.w-sky.net. Disable TLS
+# verification at the Node layer for the whole workflow. Safe because every
+# host we contact is gitea.w-sky.net (which we control); we accept the MITM
+# risk this opens on that connection only.
+#
+# TODO: install the W-Sky root CA into each runner's NODE_EXTRA_CA_CERTS
+# (or system CA bundle) and remove this. Tracked in Issues.
+env:
+  NODE_TLS_REJECT_UNAUTHORIZED: "0"
+
 jobs:
   # ---------------------------------------------------------------------------
   # 1. Fetch upstream binaries (linux runner; bash + curl + standard tools).
