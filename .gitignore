@@ -1,0 +1,18 @@
+# Build artifacts (assembled per-release by scripts/build-bundle.*)
+/build/
+/dist/
+
+# Downloaded upstream archives + checksums (cache; reproducible from upstream)
+/dist-cache/
+
+# Local stable path for the developer's own Claude Code / Codex install
+# (this is the user's runtime, not part of the project)
+/bin/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+.vscode/
+.idea/

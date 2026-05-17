@@ -1,0 +1,91 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/manifest.schema.json",
+  "manifest_version": "0.3",
+  "name": "gitea",
+  "display_name": "Gitea",
+  "version": "0.1.0",
+  "description": "Interact with Gitea instances - repos, issues, pull requests, releases.",
+  "long_description": "Wraps the official gitea-mcp server (https://gitea.com/gitea/gitea-mcp) v1.3.0 as a one-click Claude Desktop extension. Provides ~50 MCP tools for browsing repositories, managing issues and pull requests, reading code, releases, tags, branches, labels, milestones, wiki, packages, and Gitea Actions on any Gitea instance, including self-hosted ones.\n\nUnofficial packaging. The server binaries are built by the upstream Gitea project and re-distributed here verbatim, verified against the upstream SHA256 checksums file.\n\nSupports win32, darwin, and linux on amd64. Apple Silicon and Windows on ARM run via OS-provided emulation (Rosetta 2 / x64 emulation). Native arm64 binaries planned for a future release.",
+  "author": {
+    "name": "Orenthal Author",
+    "url": "https://gitea.w-sky.net/rustcor"
+  },
+  "homepage": "https://gitea.com/gitea/gitea-mcp",
+  "documentation": "https://gitea.com/gitea/gitea-mcp",
+  "support": "https://gitea.com/gitea/gitea-mcp/issues",
+  "license": "MIT",
+  "keywords": [
+    "gitea",
+    "git",
+    "scm",
+    "issues",
+    "pull-requests",
+    "self-hosted",
+    "forge"
+  ],
+  "server": {
+    "type": "binary",
+    "entry_point": "server/gitea-mcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/gitea-mcp",
+      "args": [
+        "-t",
+        "stdio",
+        "-H",
+        "${user_config.host}"
+      ],
+      "env": {
+        "GITEA_ACCESS_TOKEN": "${user_config.token}",
+        "GITEA_INSECURE": "${user_config.allow_insecure_tls}",
+        "GITEA_READONLY": "${user_config.read_only}"
+      },
+      "platform_overrides": {
+        "win32": {
+          "command": "${__dirname}/server/gitea-mcp.exe"
+        },
+        "darwin": {
+          "command": "${__dirname}/server/gitea-mcp-darwin"
+        },
+        "linux": {
+          "command": "${__dirname}/server/gitea-mcp-linux"
+        }
+      }
+    }
+  },
+  "user_config": {
+    "host": {
+      "type": "string",
+      "title": "Gitea host URL",
+      "description": "Base URL of your Gitea instance, e.g. https://gitea.com or https://gitea.example.internal",
+      "required": true
+    },
+    "token": {
+      "type": "string",
+      "title": "Personal access token",
+      "description": "Create at <host>/user/settings/applications. Needs repo, issue, and PR scopes.",
+      "sensitive": true,
+      "required": true
+    },
+    "allow_insecure_tls": {
+      "type": "string",
+      "title": "Allow insecure TLS (advanced)",
+      "description": "Set to \"true\" only for self-signed cert hosts. Leave blank otherwise.",
+      "required": false,
+      "default": ""
+    },
+    "read_only": {
+      "type": "string",
+      "title": "Read-only mode",
+      "description": "Set to \"true\" to disable write tools (no issue/PR/release creation). Leave blank for full read+write access.",
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "win32",
+      "darwin",
+      "linux"
+    ]
+  }
+}
