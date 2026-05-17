@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 rustcor
+Copyright (c) 2026 Rustcor Foundry
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -26,3 +26,8 @@ This repository packages the upstream gitea-mcp server
 (https://gitea.com/gitea/gitea-mcp), which is distributed under its own MIT
 license. A copy of upstream's license travels inside each .mcpb bundle as
 UPSTREAM_LICENSE.
+
+The Gitea name and logo are trademarks of the Gitea project. They are used
+here under their brand guidelines to identify the upstream server that this
+bundle packages. Rustcor Foundry is not affiliated with or endorsed by the
+Gitea project.

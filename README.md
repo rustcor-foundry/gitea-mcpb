@@ -1,46 +1,66 @@
+<div align="center">
+
+<img src="icon.png" alt="Gitea logo" width="128" height="128" />
+
 # gitea-mcpb
 
-One-click and one-snippet install of the official [Gitea MCP server](https://gitea.com/gitea/gitea-mcp) for Claude Desktop, Claude Code CLI, and Codex CLI.
+**One-click install of the official Gitea MCP server for Claude Desktop, Claude Code, and Codex.**
 
-Wraps upstream `gitea-mcp` (Go binary, MIT-licensed, maintained by the Gitea project itself) and ships it in three forms so it works wherever you talk to AI.
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Upstream: gitea-mcp](https://img.shields.io/badge/upstream-gitea--mcp-green.svg)](https://gitea.com/gitea/gitea-mcp)
+[![MCPB: v0.3](https://img.shields.io/badge/MCPB-v0.3-orange.svg)](https://github.com/anthropics/mcpb)
 
-| Client | Install path | Effort |
+</div>
+
+---
+
+`gitea-mcpb` packages the [official Gitea MCP server](https://gitea.com/gitea/gitea-mcp) — written and maintained by the Gitea project itself — as a DXT/MCPB bundle for Claude Desktop, with matching install snippets for Claude Code CLI and Codex CLI. Same upstream binary in all three. No Python toolchain, no forks, no glue code: you talk to your Gitea from any MCP client with one consistent surface of ~50 tools.
+
+Built and maintained by **[Rustcor Foundry](https://gitea.w-sky.net/rustcor)**.
+
+## Pick your install
+
+| Client | How to install | Time |
 |---|---|---|
-| Claude Desktop | Double-click `.mcpb` bundle | 30 seconds |
-| Claude Code CLI | Paste a JSON snippet into `~/.claude.json` | 1 minute |
-| Codex CLI | Paste a TOML snippet into `~/.codex/config.toml` | 1 minute |
+| **Claude Desktop** | Download the `.mcpb` from [Releases](https://gitea.w-sky.net/rustcor/gitea-mcpb/releases), double-click | ~30 sec |
+| **Claude Code CLI** | Paste JSON snippet into `~/.claude.json` | ~1 min |
+| **Codex CLI** | Paste TOML snippet into `~/.codex/config.toml` | ~1 min |
 
-The MCP server itself is the same upstream Go binary in all three cases. Only the wrapper differs.
+Detailed steps below.
+
+## Why
+
+Claude Desktop installs MCP servers as MCPB extensions tracked in `extensions-installations.json`. Hand-editing the legacy `claude_desktop_config.json` no longer works — entries are silently dropped on app restart. The Anthropic curated marketplace ships GitHub and GitLab MCPs but had no Gitea bundle, even though the Gitea project publishes an official `gitea-mcp` Go server.
+
+This bundle closes that gap once for everyone, and bundles the same binary as drop-in snippets for the two CLI clients while we're at it.
 
 ## Prerequisites
 
-1. A Gitea instance you can reach.
-2. A personal access token. Create at `<your-gitea-host>/user/settings/applications`, scopes:
-   - `repository` (read or write, your choice)
-   - `issue`
-   - `pull_request`
-   - `read:user` (for `get_me`)
+- A Gitea instance you can reach (gitea.com, or self-hosted).
+- A Gitea personal access token. Create at `<your-gitea-host>/user/settings/applications` with these scopes:
+  - `repository` (read or write — your choice)
+  - `issue`
+  - `pull_request`
+  - `read:user` (for `get_me`)
 
-If your Gitea uses a self-signed TLS cert, you'll also need `GITEA_INSECURE=true` (covered in each install section).
+If your Gitea uses a self-signed TLS cert, you'll also need to set `GITEA_INSECURE=true` (covered in each section below).
 
 ---
 
 ## Install: Claude Desktop (`.mcpb`)
 
-1. Download the latest `gitea-X.Y.Z.mcpb` from [Releases](#) <!-- link once published -->.
-2. Double-click the file. Claude Desktop opens its install dialog.
-3. Enter your Gitea host URL and access token.
+1. Download the latest `gitea-X.Y.Z.mcpb` from [Releases](https://gitea.w-sky.net/rustcor/gitea-mcpb/releases).
+2. Double-click. Claude Desktop opens its install dialog.
+3. Fill in host URL and access token. (Optionally toggle insecure TLS / read-only.)
 4. Done. New chats have the `gitea` MCP tools available.
 
-The bundle ships amd64 binaries for win32, darwin, and linux. Apple Silicon and Windows-on-ARM run via OS-provided emulation (Rosetta 2 / x64 emulation). Native arm64 binaries are planned.
+The main bundle ships **amd64** binaries for win32, darwin, and linux. Apple Silicon and Windows-on-ARM run via OS-provided emulation (Rosetta 2 / x64 emulation) and work fine. Per-arch sidecar bundles (`gitea-X.Y.Z-darwin-arm64.mcpb`, etc.) are also published if you want native arm64.
 
 To uninstall: **Settings → Extensions → Gitea → Uninstall**.
 
----
-
 ## Install: Claude Code CLI
 
-Paste this block into `~/.claude.json` (top level, alongside other settings). Replace `<...>` placeholders.
+Add this block to `~/.claude.json` (top level, alongside other settings):
 
 ```json
 "mcpServers": {
@@ -55,24 +75,15 @@ Paste this block into `~/.claude.json` (top level, alongside other settings). Re
 }
 ```
 
-Where to get the binary:
-- **Windows:** [`gitea-mcp_Windows_x86_64.zip`](https://gitea.com/gitea/gitea-mcp/releases) — extract `gitea-mcp.exe`
-- **macOS:** [`gitea-mcp_Darwin_x86_64.tar.gz`](https://gitea.com/gitea/gitea-mcp/releases) — extract `gitea-mcp`
-- **Linux:** [`gitea-mcp_Linux_x86_64.tar.gz`](https://gitea.com/gitea/gitea-mcp/releases) — extract `gitea-mcp`
+Download the binary for your OS from [upstream releases](https://gitea.com/gitea/gitea-mcp/releases) (or extract from a downloaded `.mcpb`), drop it somewhere stable like `~/.local/bin/gitea-mcp` or `%LOCALAPPDATA%\gitea-mcp\gitea-mcp.exe`, and point `command` at it.
 
-Drop the binary anywhere stable (e.g. `~/.local/bin/`, `%LOCALAPPDATA%\gitea-mcp\`) and point `command` at it.
-
-Restart Claude Code. The `gitea` server appears in the trust prompt — accept it. Test:
+Restart Claude Code. Accept the `gitea` server in the trust prompt. Test:
 
 > Use the gitea MCP to list repos under `<your-org>`.
 
-If you'd rather not put the token in JSON, set `GITEA_ACCESS_TOKEN` in your user environment and use a small wrapper script as `command`. Claude Code doesn't have a built-in "read from env" hint like Codex does.
-
----
-
 ## Install: Codex CLI
 
-Paste this block into `~/.codex/config.toml`.
+Add this block to `~/.codex/config.toml`:
 
 ```toml
 [mcp_servers.gitea]
@@ -84,69 +95,81 @@ startup_timeout_sec = 60
 tool_timeout_sec = 120
 ```
 
-Then set the token in your shell environment (one-time, persists):
+Then set the token in your user environment (one-time, persists across sessions):
 
-**Windows (PowerShell, user scope):**
+**Windows PowerShell:**
 ```powershell
 [System.Environment]::SetEnvironmentVariable("GITEA_ACCESS_TOKEN", "<your_pat>", "User")
 ```
 
-**macOS / Linux (add to `~/.zshrc` or `~/.bashrc`):**
+**macOS / Linux** (`~/.zshrc` or `~/.bashrc`):
 ```bash
 export GITEA_ACCESS_TOKEN="<your_pat>"
 ```
 
-Restart Codex. Test with:
-
-```
-codex
-> use gitea to list repos under <your-org>
-```
-
-`env_vars` reads from Codex's local environment at server-spawn time — the token never lands in `config.toml`.
+Restart Codex. The `env_vars` mechanism reads from Codex's local environment at server-spawn time — the token never lands in `config.toml`.
 
 ---
 
-## Tool surface
+## What you get
 
-The upstream server exposes ~50 MCP tools across:
+The upstream server exposes ~50 MCP tools spanning every common Gitea workflow:
 
-- **Repositories** — `list_my_repos`, `list_org_repos`, `search_repos`, `create_repo`, `fork_repo`, `get_repository_tree`, `get_dir_contents`, `get_file_contents`, `create_or_update_file`, `delete_file`
-- **Branches & commits** — `list_branches`, `create_branch`, `delete_branch`, `list_commits`, `get_commit`
-- **Tags & releases** — `list_tags`, `get_tag`, `create_tag`, `delete_tag`, `list_releases`, `get_release`, `get_latest_release`, `create_release`, `delete_release`
-- **Issues & PRs** — `list_issues`, `search_issues`, `issue_read`, `issue_write`, `list_pull_requests`, `pull_request_read`, `pull_request_write`, `pull_request_review_write`
-- **Labels & milestones** — `label_read`, `label_write`, `milestone_read`, `milestone_write`
-- **Orgs, users, notifications** — `get_me`, `get_user_orgs`, `search_users`, `search_org_teams`, `notification_read`, `notification_write`
-- **Wiki, packages, time-tracking, actions** — `wiki_read/write`, `package_read/write`, `timetracking_read/write`, `actions_config_read/write`, `actions_run_read/write`
-- **Misc** — `get_gitea_mcp_server_version`
+- **Repos** — list, search, create, fork, tree/dir/file read, file write, file delete
+- **Branches & commits** — list, create, delete, commit log, single commit
+- **Tags & releases** — list, get, create, delete, latest release
+- **Issues** — list, search, read, write
+- **Pull requests** — list, read, write, review
+- **Labels, milestones** — read + write
+- **Orgs, users, notifications** — me, orgs, search users, search teams, notification ops
+- **Wiki, packages, time-tracking, Actions** — read + write each
+- **Server introspection** — `get_gitea_mcp_server_version`
 
-`get_gitea_mcp_server_version` is useful for verifying you're on the version you think you are.
+### Limiting the surface
 
-### Limiting the tool surface
+If you want a smaller / safer set:
 
-If you want a smaller / read-only set:
-
-- **Read-only mode:** add `GITEA_READONLY=true` to the env (or pass `-r`) — disables all write tools.
-- **Explicit tool list:** add `GITEA_TOOLS=tool1,tool2,...` to the env (or pass `-O`).
+| Goal | How |
+|---|---|
+| Read-only | `GITEA_READONLY=true` (env) or `-r` (flag) |
+| Specific tools only | `GITEA_TOOLS=tool1,tool2,...` or `-O tool1,tool2,...` |
 
 ---
 
 ## Security notes
 
-- **Token storage:** the Codex install path (env var via `env_vars`) keeps the token out of any config file. The Claude Code path requires the token in `~/.claude.json` unless you wrap with a launcher. The Claude Desktop path encrypts sensitive fields at rest via DPAPI/Keychain.
-- **Self-signed TLS:** `GITEA_INSECURE=true` disables certificate verification for the connection to your Gitea host. Don't enable it unless you actually need it (i.e. your CA isn't in the system trust store).
-- **Provenance:** binaries shipped in the `.mcpb` bundle are downloaded from upstream's GitHub release at build time and verified against [`gitea-mcp_X.Y.Z_checksums.txt`](https://gitea.com/gitea/gitea-mcp/releases). The bundle is fully reproducible from this repo.
+- **Token storage**: the Codex path keeps the token out of any config file by reading it from `GITEA_ACCESS_TOKEN`. The Claude Code path requires the token in `~/.claude.json` unless you wrap with a launcher. The Claude Desktop path encrypts `sensitive: true` fields at rest (DPAPI on Windows, Keychain on macOS).
+- **Self-signed TLS**: `GITEA_INSECURE=true` disables certificate verification for the connection to your Gitea host. Don't enable it unless you actually need it.
+- **Binary provenance**: every binary inside a `.mcpb` is downloaded from upstream's release at CI build time and verified against [`gitea-mcp_X.Y.Z_checksums.txt`](https://gitea.com/gitea/gitea-mcp/releases). The freebsd-amd64 binary (which upstream doesn't ship) is built from source at the same tag on our own runner. The bundle is reproducible from this repo: run `scripts/fetch-upstream.sh <version> && scripts/build-bundle.sh <version>`.
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting.
 
 ## Versioning
 
-`gitea-mcpb` version mirrors upstream `gitea-mcp` exactly. If we ship a packaging-only fix without an upstream change, we append `+pkg.N`: e.g. `1.3.0+pkg.1`.
+`gitea-mcpb` version mirrors upstream `gitea-mcp` exactly. If we ship a packaging-only fix without an upstream change, we append `+pkg.N` (e.g. `1.3.0+pkg.1`). See [CHANGELOG.md](CHANGELOG.md).
 
-## Upstream
+## Platform coverage
 
-- Server: https://gitea.com/gitea/gitea-mcp
-- Issues with the underlying tools, server behavior, or Gitea API surface → file there.
-- Issues with packaging (manifest, install, bundle format) → file here.
+| Platform | Source | CI-tested |
+|---|---|---|
+| Linux amd64 | Upstream binary | ✅ native |
+| Linux arm64 | Upstream binary | ⚠️ shipped untested |
+| Windows amd64 | Upstream binary | ✅ native |
+| Windows arm64 | Upstream binary | ⚠️ shipped untested |
+| macOS amd64 (Intel) | Upstream binary | ⚠️ tested via Rosetta only |
+| macOS arm64 (Apple Silicon) | Upstream binary | ✅ native |
+| FreeBSD amd64 | **Built from source in CI** | ✅ native |
+
+## Contributing
+
+Bug reports, feature requests, and PRs welcome at [Issues](https://gitea.w-sky.net/rustcor/gitea-mcpb/issues). See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and CI structure.
+
+Bugs in the **underlying server** (tool behavior, Gitea API surface, performance) → file upstream at [gitea.com/gitea/gitea-mcp](https://gitea.com/gitea/gitea-mcp/issues). Bugs in the **packaging** (manifest, install flow, bundle format, install scripts) → file here.
+
+## Acknowledgments
+
+The MCP server itself is the work of the [Gitea project](https://gitea.com/gitea/gitea-mcp). This repo is just packaging. The Gitea name and logo are trademarks of the Gitea project, used here under their brand guidelines to identify the upstream server we package. Rustcor Foundry is not affiliated with or endorsed by the Gitea project.
 
 ## License
 
-MIT, matching upstream. The bundled binary is © the Gitea project under their license (also MIT-style; see `UPSTREAM_LICENSE` inside the bundle).
+[MIT](LICENSE), matching upstream. The bundled server binary is © the Gitea project under its own MIT license (a copy travels inside every `.mcpb` as `UPSTREAM_LICENSE`).

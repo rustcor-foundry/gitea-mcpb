@@ -7,12 +7,13 @@
   "description": "Interact with Gitea instances - repos, issues, pull requests, releases.",
   "long_description": "Wraps the official gitea-mcp server (https://gitea.com/gitea/gitea-mcp) v1.3.0 as a one-click Claude Desktop extension. Provides ~50 MCP tools for browsing repositories, managing issues and pull requests, reading code, releases, tags, branches, labels, milestones, wiki, packages, and Gitea Actions on any Gitea instance, including self-hosted ones.\n\nUnofficial packaging. The server binaries are built by the upstream Gitea project and re-distributed here verbatim, verified against the upstream SHA256 checksums file.\n\nSupports win32, darwin, and linux on amd64. Apple Silicon and Windows on ARM run via OS-provided emulation (Rosetta 2 / x64 emulation). Native arm64 binaries planned for a future release.",
   "author": {
-    "name": "Orenthal Author",
-    "url": "https://gitea.w-sky.net/rustcor"
+    "name": "Rustcor Foundry",
+    "url": "https://gitea.w-sky.net/rustcor/gitea-mcpb"
   },
-  "homepage": "https://gitea.com/gitea/gitea-mcp",
-  "documentation": "https://gitea.com/gitea/gitea-mcp",
-  "support": "https://gitea.com/gitea/gitea-mcp/issues",
+  "icon": "icon.png",
+  "homepage": "https://gitea.w-sky.net/rustcor/gitea-mcpb",
+  "documentation": "https://gitea.w-sky.net/rustcor/gitea-mcpb#readme",
+  "support": "https://gitea.w-sky.net/rustcor/gitea-mcpb/issues",
   "license": "MIT",
   "keywords": [
     "gitea",
