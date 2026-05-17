@@ -40,7 +40,7 @@ cp "$CACHE/extract-linux-amd64/LICENSE" "$BUILD/UPSTREAM_LICENSE"
 # Pack as zip with .mcpb extension. cd into BUILD so paths are bundle-relative.
 BUNDLE="$DIST/gitea-${VERSION}.mcpb"
 rm -f "$BUNDLE"
-(cd "$BUILD" && zip -rq "$BUNDLE" .)
+python3 scripts/_zipdir.py "$BUILD" "$BUNDLE"
 
 # Per-arch sidecar bundles for users who want native arm64 (no Rosetta).
 # These contain only the relevant binary; the manifest still references the
@@ -60,7 +60,7 @@ for triple in win-arm64 darwin-arm64 linux-arm64; do
   esac
   ARCH_BUNDLE="$DIST/gitea-${VERSION}-${triple}.mcpb"
   rm -f "$ARCH_BUNDLE"
-  (cd "$ARCH_BUILD" && zip -rq "$ARCH_BUNDLE" .)
+  python3 scripts/_zipdir.py "$ARCH_BUILD" "$ARCH_BUNDLE"
 done
 
 # Optional: pack the freebsd-built binary if present in extract-freebsd-amd64
@@ -75,7 +75,7 @@ if [ -d "$CACHE/extract-freebsd-amd64" ] && [ -f "$CACHE/extract-freebsd-amd64/g
   cp "$CACHE/extract-freebsd-amd64/gitea-mcp" "$FB_BUILD/server/gitea-mcp-freebsd"
   FB_BUNDLE="$DIST/gitea-${VERSION}-freebsd-amd64.mcpb"
   rm -f "$FB_BUNDLE"
-  (cd "$FB_BUILD" && zip -rq "$FB_BUNDLE" .)
+  python3 scripts/_zipdir.py "$FB_BUILD" "$FB_BUNDLE"
 fi
 
 # Emit a SHA256SUMS file for all artifacts (matches upstream's pattern)

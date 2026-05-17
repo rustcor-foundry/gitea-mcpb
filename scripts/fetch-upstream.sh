@@ -59,12 +59,13 @@ for entry in "${ARCHIVES[@]}"; do
     exit 1
   fi
 
-  # Extract
+  # Extract. Use python3 -m zipfile for .zip so we don't depend on `unzip` being
+  # installed on minimal runner images (debian13 minimal doesn't ship it).
   EXTRACT_DIR="$CACHE/extract-$PLATFORM"
   rm -rf "$EXTRACT_DIR"
   mkdir -p "$EXTRACT_DIR"
   case "$ARCHIVE" in
-    *.zip)    unzip -q "$CACHE/$ARCHIVE" -d "$EXTRACT_DIR" ;;
+    *.zip)    python3 -m zipfile -e "$CACHE/$ARCHIVE" "$EXTRACT_DIR" ;;
     *.tar.gz) tar -xzf "$CACHE/$ARCHIVE" -C "$EXTRACT_DIR" ;;
     *) echo "ERROR: unknown archive type: $ARCHIVE" >&2; exit 1 ;;
   esac
