@@ -1,0 +1,26 @@
+# Force LF for everything that runs on Linux/BSD/macOS runners. CRLF in a
+# shebang line breaks bash with "no such file or directory".
+*           text=auto eol=lf
+*.sh        text eol=lf
+*.py        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.json      text eol=lf
+*.md        text eol=lf
+
+# Windows-native scripts get CRLF (cmd/PowerShell expect it).
+*.bat       text eol=crlf
+*.cmd       text eol=crlf
+*.ps1       text eol=crlf
+
+# Binary types that should never be EOL-normalized.
+*.exe       binary
+*.dll       binary
+*.so        binary
+*.dylib     binary
+*.png       binary
+*.jpg       binary
+*.ico       binary
+*.mcpb      binary
+*.zip       binary
+*.tar.gz    binary
