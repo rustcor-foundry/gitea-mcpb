@@ -253,20 +253,51 @@ jobs:
           PRERELEASE: ${{ steps.prerel.outputs.is_prerelease }}
         run: |
           set -euo pipefail
-          # Create the release
-          curl -fsS -X POST \
-            -H "Authorization: token $GITEA_TOKEN" \
-            -H "Content-Type: application/json" \
-            "$GITEA_HOST/api/v1/repos/$REPO/releases" \
-            -d "$(jq -n \
-                    --arg tag "$TAG" \
-                    --arg name "gitea-mcpb $TAG" \
-                    --arg body "Wraps upstream gitea-mcp v$UPSTREAM. Bundle version $BUNDLE. See README for install paths." \
-                    --argjson prerelease "$PRERELEASE" \
-                    '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:$prerelease}')" \
-            > release.json
-          RELEASE_ID="$(jq -r '.id' release.json)"
-          echo "==> created release id=$RELEASE_ID (prerelease=$PRERELEASE)"
+
+          # Build the JSON body with python (jq isn't on the minimal runner).
+          BODY="$(python3 -c '
+          import json, os
+          print(json.dumps({
+              "tag_name":   os.environ["TAG"],
+              "name":       "gitea-mcpb " + os.environ["TAG"],
+              "body":       "Wraps upstream gitea-mcp v{u}. Bundle version {b}. See README for install paths.".format(
+                                u=os.environ["UPSTREAM"], b=os.environ["BUNDLE"]),
+              "draft":      False,
+              "prerelease": os.environ["PRERELEASE"] == "true",
+          }))
+          ')"
+
+          # Idempotent create: if release already exists for this tag (from a
+          # prior partial run), fetch its id; otherwise create. Either path
+          # ends with RELEASE_ID set.
+          set +e
+          EXISTING="$(curl -fsS -H "Authorization: token $GITEA_TOKEN" \
+                       "$GITEA_HOST/api/v1/repos/$REPO/releases/tags/$TAG" 2>/dev/null)"
+          EXISTING_RC=$?
+          set -e
+          if [ $EXISTING_RC -eq 0 ] && [ -n "$EXISTING" ]; then
+            RELEASE_ID="$(echo "$EXISTING" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')"
+            echo "==> existing release found, id=$RELEASE_ID; will replace its assets"
+            # Clear existing assets to avoid name collisions on re-upload
+            ASSETS="$(curl -fsS -H "Authorization: token $GITEA_TOKEN" \
+                        "$GITEA_HOST/api/v1/repos/$REPO/releases/$RELEASE_ID/assets")"
+            echo "$ASSETS" | python3 -c '
+          import sys, json
+          for a in json.load(sys.stdin): print(a["id"])
+          ' | while read -r AID; do
+              [ -n "$AID" ] && curl -fsS -X DELETE \
+                -H "Authorization: token $GITEA_TOKEN" \
+                "$GITEA_HOST/api/v1/repos/$REPO/releases/$RELEASE_ID/assets/$AID"
+            done
+          else
+            RESPONSE="$(curl -fsS -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d "$BODY" \
+              "$GITEA_HOST/api/v1/repos/$REPO/releases")"
+            RELEASE_ID="$(echo "$RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')"
+            echo "==> created release id=$RELEASE_ID (prerelease=$PRERELEASE)"
+          fi
 
           # Attach each artifact
           for f in dist/*; do

@@ -18,7 +18,7 @@ jobs:
         id: cmp
         run: |
           OUR="$(python3 -c 'import json; print(json.load(open("manifest.json"))["version"])')"
-          UPSTREAM="$(curl -fsS https://gitea.com/api/v1/repos/gitea/gitea-mcp/releases/latest | jq -r .tag_name | sed 's/^v//')"
+          UPSTREAM="$(curl -fsS https://gitea.com/api/v1/repos/gitea/gitea-mcp/releases/latest | python3 -c 'import sys,json; print(json.load(sys.stdin)["tag_name"].lstrip("v"))')"
           echo "ours=$OUR"      >> "$GITHUB_OUTPUT"
           echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
           if [ "$OUR" = "$UPSTREAM" ]; then
@@ -59,12 +59,19 @@ jobs:
               -c "http.extraHeader=Authorization: token $GITEA_TOKEN" \
               push -u origin "$BRANCH"
 
-          # Open PR
+          # Open PR (json body built with python; jq isn't on the minimal runner)
+          export BRANCH OURS UPSTREAM
+          BODY="$(python3 -c '
+          import json, os
+          print(json.dumps({
+              "head":  os.environ["BRANCH"],
+              "base":  "main",
+              "title": "chore: bump upstream gitea-mcp {o} -> {u}".format(o=os.environ["OURS"], u=os.environ["UPSTREAM"]),
+              "body":  "Automated bump triggered by upstream-watch. Merging this PR tags v{u} and triggers a full release build.".format(u=os.environ["UPSTREAM"]),
+          }))
+          ')"
           curl -fsS -X POST \
             -H "Authorization: token $GITEA_TOKEN" \
             -H "Content-Type: application/json" \
-            "$GITEA_HOST/api/v1/repos/$REPO/pulls" \
-            -d "$(jq -n --arg head "$BRANCH" --arg upstream "$UPSTREAM" --arg ours "$OURS" \
-                     '{head:$head, base:"main",
-                       title:("chore: bump upstream gitea-mcp " + $ours + " -> " + $upstream),
-                       body:("Automated bump triggered by upstream-watch. Merging this PR tags v" + $upstream + " and triggers a full release build.")}')"
+            -d "$BODY" \
+            "$GITEA_HOST/api/v1/repos/$REPO/pulls"
