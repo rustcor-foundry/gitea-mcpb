@@ -1,0 +1,221 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build (without leading v). Used for manual dry runs."
+        required: true
+        default: "1.3.0"
+
+# Concurrency: don't run two release builds for the same tag in parallel.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Fetch upstream binaries (linux runner; bash + curl + standard tools).
+  # ---------------------------------------------------------------------------
+  fetch-upstream:
+    runs-on: [self-hosted, linux]
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version (from tag or workflow input)
+        id: version
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "==> resolved version: $V"
+
+      - name: Fetch + verify upstream binaries
+        run: |
+          chmod +x scripts/fetch-upstream.sh
+          ./scripts/fetch-upstream.sh "${{ steps.version.outputs.version }}"
+
+      - name: Upload upstream binaries as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-binaries
+          path: dist-cache/extract-*/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 2. Build freebsd-amd64 from source (upstream doesn't ship a FreeBSD binary).
+  # ---------------------------------------------------------------------------
+  build-freebsd:
+    runs-on: [self-hosted, freebsd]
+    needs: fetch-upstream
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build from source
+        run: |
+          chmod +x scripts/build-from-source-freebsd.sh
+          ./scripts/build-from-source-freebsd.sh "${{ needs.fetch-upstream.outputs.version }}"
+
+      - name: Upload freebsd binary as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-freebsd-amd64
+          path: dist-cache/extract-freebsd-amd64/
+          retention-days: 7
+
+  # ---------------------------------------------------------------------------
+  # 3. Native smoke-test on each platform we have a runner for.
+  #    Skipped platforms (linux-arm64, win-arm64) are shipped unverified.
+  # ---------------------------------------------------------------------------
+  smoke-test:
+    needs: [fetch-upstream, build-freebsd]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            runs-on: [self-hosted, linux]
+            binary: gitea-mcp
+            shell: bash
+          - target: windows-amd64
+            runs-on: [self-hosted, windows]
+            binary: gitea-mcp.exe
+            shell: pwsh
+          - target: darwin-arm64
+            runs-on: [macos-arm64]
+            binary: gitea-mcp
+            shell: bash
+          - target: darwin-amd64
+            runs-on: [macos-arm64]   # Rosetta — same Mac mini
+            binary: gitea-mcp
+            shell: bash
+          - target: freebsd-amd64
+            runs-on: [self-hosted, freebsd]
+            binary: gitea-mcp
+            shell: bash
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifact for this platform
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.target == 'freebsd-amd64' && 'upstream-freebsd-amd64' || 'upstream-binaries' }}
+          path: ./_artifact
+
+      - name: Locate binary
+        id: locate
+        shell: ${{ matrix.shell }}
+        run: |
+          if [ "${{ matrix.shell }}" = "pwsh" ]; then exit 0; fi
+          # bash branch
+          if [ "${{ matrix.target }}" = "freebsd-amd64" ]; then
+            BIN="$(pwd)/_artifact/${{ matrix.binary }}"
+          else
+            BIN="$(pwd)/_artifact/extract-${{ matrix.target }}/${{ matrix.binary }}"
+          fi
+          chmod +x "$BIN"
+          echo "bin=$BIN" >> "$GITHUB_OUTPUT"
+
+      - name: Locate binary (windows)
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: |
+          $bin = Join-Path (Get-Location) "_artifact\extract-${{ matrix.target }}\${{ matrix.binary }}"
+          echo "bin=$bin" >> $env:GITHUB_OUTPUT
+        id: locate-win
+
+      - name: Smoke-test (MCP handshake)
+        shell: ${{ matrix.shell }}
+        run: |
+          if [ "${{ matrix.shell }}" = "pwsh" ]; then exit 0; fi
+          python3 scripts/smoke-test-mcp.py "${{ steps.locate.outputs.bin }}"
+
+      - name: Smoke-test (MCP handshake, windows)
+        if: matrix.shell == 'pwsh'
+        shell: pwsh
+        run: python scripts/smoke-test-mcp.py "${{ steps.locate-win.outputs.bin }}"
+
+  # ---------------------------------------------------------------------------
+  # 4. Pack the .mcpb bundle (main + per-arch sidecars).
+  # ---------------------------------------------------------------------------
+  pack:
+    needs: [fetch-upstream, build-freebsd, smoke-test]
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream-binaries
+          path: dist-cache/
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: upstream-freebsd-amd64
+          path: dist-cache/extract-freebsd-amd64/
+
+      - name: Build all bundles
+        run: |
+          chmod +x scripts/build-bundle.sh
+          ./scripts/build-bundle.sh "${{ needs.fetch-upstream.outputs.version }}"
+
+      - name: Upload bundles as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mcpb-bundles
+          path: dist/
+          retention-days: 90
+
+  # ---------------------------------------------------------------------------
+  # 5. Create the Gitea release and attach bundles.
+  # ---------------------------------------------------------------------------
+  release:
+    needs: [fetch-upstream, pack]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: mcpb-bundles
+          path: dist/
+
+      - name: Create release and attach bundles
+        env:
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_HOST: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ needs.fetch-upstream.outputs.version }}
+        run: |
+          set -euo pipefail
+          # Create the release
+          curl -fsS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$GITEA_HOST/api/v1/repos/$REPO/releases" \
+            -d "$(jq -n --arg tag "$TAG" --arg name "gitea-mcpb $TAG" \
+                      --arg body "Wraps upstream gitea-mcp v$VERSION. See README for install paths." \
+                      '{tag_name:$tag, name:$name, body:$body, draft:false, prerelease:false}')" \
+            > release.json
+          RELEASE_ID="$(jq -r '.id' release.json)"
+          echo "==> created release id=$RELEASE_ID"
+
+          # Attach each artifact
+          for f in dist/*; do
+            echo "==> attaching $(basename "$f")"
+            curl -fsS -X POST \
+              -H "Authorization: token $GITEA_TOKEN" \
+              -F "attachment=@$f" \
+              "$GITEA_HOST/api/v1/repos/$REPO/releases/$RELEASE_ID/assets?name=$(basename "$f")"
+          done
+          echo "==> done"

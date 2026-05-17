@@ -1,0 +1,54 @@
+name: pr
+
+on:
+  pull_request:
+    branches: [main]
+
+# Cheap-and-fast checks on PRs. The expensive multi-platform smoke tests run
+# on tags via release.yml.
+
+jobs:
+  lint-manifest:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate manifest.json parses + has required fields
+        run: |
+          python3 - <<'EOF'
+          import json, sys
+          m = json.load(open("manifest.json"))
+          required = ["manifest_version", "name", "version", "description",
+                      "author", "server", "user_config", "compatibility"]
+          missing = [k for k in required if k not in m]
+          if missing:
+              print(f"FAIL: missing top-level keys: {missing}", file=sys.stderr)
+              sys.exit(1)
+          if m["server"].get("type") != "binary":
+              print(f"FAIL: server.type must be 'binary', got {m['server'].get('type')}", file=sys.stderr)
+              sys.exit(1)
+          po = m["server"].get("mcp_config", {}).get("platform_overrides", {})
+          for p in ["win32", "darwin", "linux"]:
+              if p not in po:
+                  print(f"FAIL: platform_overrides missing {p}", file=sys.stderr)
+                  sys.exit(1)
+          print(f"OK: manifest looks valid (v{m['version']})")
+          EOF
+
+  dry-pack:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read version from manifest
+        id: ver
+        run: |
+          V="$(python3 -c 'import json; print(json.load(open("manifest.json"))["version"])')"
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch + pack (without releasing)
+        run: |
+          chmod +x scripts/fetch-upstream.sh scripts/build-bundle.sh
+          ./scripts/fetch-upstream.sh "${{ steps.ver.outputs.version }}"
+          ./scripts/build-bundle.sh   "${{ steps.ver.outputs.version }}"
+          ls -la dist/

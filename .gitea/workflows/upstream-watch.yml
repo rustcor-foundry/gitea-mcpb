@@ -1,0 +1,70 @@
+name: upstream-watch
+
+on:
+  schedule:
+    # 13:00 UTC daily
+    - cron: "0 13 * * *"
+  workflow_dispatch:
+
+jobs:
+  check-upstream:
+    runs-on: [self-hosted, linux]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compare upstream latest vs our manifest
+        id: cmp
+        run: |
+          OUR="$(python3 -c 'import json; print(json.load(open("manifest.json"))["version"])')"
+          UPSTREAM="$(curl -fsS https://gitea.com/api/v1/repos/gitea/gitea-mcp/releases/latest | jq -r .tag_name | sed 's/^v//')"
+          echo "ours=$OUR"      >> "$GITHUB_OUTPUT"
+          echo "upstream=$UPSTREAM" >> "$GITHUB_OUTPUT"
+          if [ "$OUR" = "$UPSTREAM" ]; then
+            echo "match=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "match=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "ours=$OUR / upstream=$UPSTREAM"
+
+      - name: Open bump PR
+        if: steps.cmp.outputs.match == 'false'
+        env:
+          GITEA_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEA_HOST: ${{ github.server_url }}
+          REPO: ${{ github.repository }}
+          OURS: ${{ steps.cmp.outputs.ours }}
+          UPSTREAM: ${{ steps.cmp.outputs.upstream }}
+        run: |
+          set -euo pipefail
+          BRANCH="bot/bump-upstream-$UPSTREAM"
+
+          git config user.email "ci@w-sky.net"
+          git config user.name  "ci-bot"
+          git checkout -b "$BRANCH"
+
+          # Bump manifest version
+          python3 - <<EOF
+          import json
+          m = json.load(open("manifest.json"))
+          m["version"] = "$UPSTREAM"
+          json.dump(m, open("manifest.json", "w"), indent=2)
+          open("manifest.json", "a").write("\n")
+          EOF
+
+          git add manifest.json
+          git commit -m "chore: bump upstream gitea-mcp $OURS -> $UPSTREAM"
+          git -c http.sslVerify=false \
+              -c "http.extraHeader=Authorization: token $GITEA_TOKEN" \
+              push -u origin "$BRANCH"
+
+          # Open PR
+          curl -fsS -X POST \
+            -H "Authorization: token $GITEA_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$GITEA_HOST/api/v1/repos/$REPO/pulls" \
+            -d "$(jq -n --arg head "$BRANCH" --arg upstream "$UPSTREAM" --arg ours "$OURS" \
+                     '{head:$head, base:"main",
+                       title:("chore: bump upstream gitea-mcp " + $ours + " -> " + $upstream),
+                       body:("Automated bump triggered by upstream-watch. Merging this PR tags v" + $upstream + " and triggers a full release build.")}')"
