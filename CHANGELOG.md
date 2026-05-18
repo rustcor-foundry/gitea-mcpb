@@ -12,6 +12,13 @@ The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 Nothing pending. Tag the next upstream release to ship.
 
+## [1.3.2] — 2026-05-18
+
+Packaging-only fix. Wraps upstream `gitea-mcp v1.3.0` (upstream unchanged).
+
+### Changed
+- `manifest.json` `homepage`, `documentation`, `support`, and `author.url` now point at the public GitHub mirror (`github.com/rustcor-foundry/gitea-mcpb`) instead of the internal Gitea instance. Outside users can actually reach the project this way. The Gitea repo remains the development origin; GitHub is the public canonical for end users.
+
 ## [1.3.1] — 2026-05-17
 
 Packaging-only fix. Wraps upstream `gitea-mcp v1.3.0` (upstream unchanged).
