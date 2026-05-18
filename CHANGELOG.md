@@ -2,7 +2,9 @@
 
 All notable changes to `gitea-mcpb` are documented here.
 
-Version numbers track upstream [`gitea-mcp`](https://gitea.com/gitea/gitea-mcp) exactly. Packaging-only re-releases use the `+pkg.N` build-metadata suffix (e.g. `1.3.0+pkg.1`).
+Version numbers track upstream [`gitea-mcp`](https://gitea.com/gitea/gitea-mcp) when we ship an upstream bump. For **packaging-only fixes** between upstream releases, we bump our own patch number ahead of upstream — e.g. `1.3.1` packages upstream `1.3.0` with our fix. The CHANGELOG entry calls out which upstream version is wrapped.
+
+(We previously planned to use SemVer build-metadata suffixes like `1.3.0+pkg.1`, but act-runner's tag-glob filter doesn't match tags containing `+`. Simple patch-bumping works with all tooling.)
 
 The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
@@ -10,13 +12,13 @@ The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 Nothing pending. Tag the next upstream release to ship.
 
-## [1.3.0+pkg.1] — 2026-05-17
+## [1.3.1] — 2026-05-17
 
-Packaging-only fix. Upstream unchanged.
+Packaging-only fix. Wraps upstream `gitea-mcp v1.3.0` (upstream unchanged).
 
 ### Fixed
 - `icon.png` is now actually included in built bundles. The manifest referenced it but the build script wasn't copying it, so Claude Desktop fell back to first-letter rendering ("G") instead of the Gitea cup-of-tea logo.
-- Workflow `is_prerelease` detection no longer flags `+pkg.N` build-metadata tags as prerelease. Per semver, only `-` denotes prerelease; `+` is build metadata.
+- Workflow `is_prerelease` detection no longer flags `+pkg.N` build-metadata tags as prerelease. Per semver, only `-` denotes prerelease; `+` is build metadata. (Moot now that we use patch-bumping instead of `+` suffixes — see CHANGELOG header — but the workflow fix stays.)
 
 ## [1.3.0] — 2026-05-17
 
