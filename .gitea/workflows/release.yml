@@ -233,7 +233,7 @@ jobs:
           name: mcpb-bundles
           path: dist/
 
-      - name: Detect prerelease (semver: only '-' is prerelease; '+' is build metadata)
+      - name: "Detect prerelease (semver: only '-' is prerelease; '+' is build metadata)"
         id: prerel
         run: |
           TAG="${{ github.ref_name }}"
