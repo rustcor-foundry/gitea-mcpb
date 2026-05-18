@@ -37,6 +37,10 @@ cp "$CACHE/extract-linux-amd64/gitea-mcp"     "$BUILD/server/gitea-mcp-linux"
 # Preserve upstream's LICENSE (any platform's copy will do — they're identical)
 cp "$CACHE/extract-linux-amd64/LICENSE" "$BUILD/UPSTREAM_LICENSE"
 
+# Bundle the extension icon (referenced as "icon": "icon.png" in manifest).
+# Without this, Claude Desktop falls back to first-letter-of-name rendering.
+cp "$ROOT/icon.png" "$BUILD/icon.png"
+
 # Pack as zip with .mcpb extension. cd into BUILD so paths are bundle-relative.
 BUNDLE="$DIST/gitea-${VERSION}.mcpb"
 rm -f "$BUNDLE"
@@ -53,6 +57,7 @@ for triple in win-arm64 darwin-arm64 linux-arm64; do
   mkdir -p "$ARCH_BUILD/server"
   cp "$BUILD/manifest.json" "$ARCH_BUILD/manifest.json"
   cp "$BUILD/UPSTREAM_LICENSE" "$ARCH_BUILD/UPSTREAM_LICENSE"
+  cp "$BUILD/icon.png" "$ARCH_BUILD/icon.png"
   case "$triple" in
     win-*)    cp "$src/gitea-mcp.exe" "$ARCH_BUILD/server/gitea-mcp.exe" ;;
     darwin-*) cp "$src/gitea-mcp"     "$ARCH_BUILD/server/gitea-mcp-darwin" ;;
@@ -70,6 +75,7 @@ if [ -d "$CACHE/extract-freebsd-amd64" ] && [ -f "$CACHE/extract-freebsd-amd64/g
   mkdir -p "$FB_BUILD/server"
   cp "$BUILD/manifest.json" "$FB_BUILD/manifest.json"
   cp "$BUILD/UPSTREAM_LICENSE" "$FB_BUILD/UPSTREAM_LICENSE"
+  cp "$BUILD/icon.png" "$FB_BUILD/icon.png"
   # MCPB v0.3 doesn't list freebsd in compatibility.platforms; this artifact is
   # for users wiring it into Claude Code / Codex directly, not Claude Desktop.
   cp "$CACHE/extract-freebsd-amd64/gitea-mcp" "$FB_BUILD/server/gitea-mcp-freebsd"

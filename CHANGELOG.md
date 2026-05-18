@@ -10,6 +10,14 @@ The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 Nothing pending. Tag the next upstream release to ship.
 
+## [1.3.0+pkg.1] — 2026-05-17
+
+Packaging-only fix. Upstream unchanged.
+
+### Fixed
+- `icon.png` is now actually included in built bundles. The manifest referenced it but the build script wasn't copying it, so Claude Desktop fell back to first-letter rendering ("G") instead of the Gitea cup-of-tea logo.
+- Workflow `is_prerelease` detection no longer flags `+pkg.N` build-metadata tags as prerelease. Per semver, only `-` denotes prerelease; `+` is build metadata.
+
 ## [1.3.0] — 2026-05-17
 
 First public release. Wraps upstream [`gitea-mcp` v1.3.0](https://gitea.com/gitea/gitea-mcp/releases/tag/v1.3.0).

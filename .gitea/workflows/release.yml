@@ -233,13 +233,15 @@ jobs:
           name: mcpb-bundles
           path: dist/
 
-      - name: Detect prerelease (anything after a dash or plus is prerelease)
+      - name: Detect prerelease (semver: only '-' is prerelease; '+' is build metadata)
         id: prerel
         run: |
           TAG="${{ github.ref_name }}"
-          case "$TAG" in
-            *-*|*+*) echo "is_prerelease=true"  >> "$GITHUB_OUTPUT" ;;
-            *)       echo "is_prerelease=false" >> "$GITHUB_OUTPUT" ;;
+          # Strip any build metadata (everything after '+') first, then check for '-'.
+          BASE="${TAG%%+*}"
+          case "$BASE" in
+            *-*) echo "is_prerelease=true"  >> "$GITHUB_OUTPUT" ;;
+            *)   echo "is_prerelease=false" >> "$GITHUB_OUTPUT" ;;
           esac
 
       - name: Create release and attach bundles
