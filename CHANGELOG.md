@@ -12,6 +12,14 @@ The format roughly follows [Keep a Changelog](https://keepachangelog.com/en/1.1.
 
 Nothing pending. Tag the next upstream release to ship.
 
+## [1.3.3] — 2026-05-18
+
+Packaging-only fix. Wraps upstream `gitea-mcp v1.3.0` (upstream unchanged).
+
+### Added
+- `PRIVACY.md` covering data flow, credential storage, telemetry posture, and contact channels. Required by the Anthropic Desktop Extensions submission process.
+- `privacy_policies` array in `manifest.json` pointing at the public PRIVACY.md URL — the Anthropic submission form expects this manifest field.
+
 ## [1.3.2] — 2026-05-18
 
 Packaging-only fix. Wraps upstream `gitea-mcp v1.3.0` (upstream unchanged).

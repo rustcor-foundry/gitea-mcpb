@@ -15,6 +15,9 @@
   "documentation": "https://github.com/rustcor-foundry/gitea-mcpb#readme",
   "support": "https://github.com/rustcor-foundry/gitea-mcpb/issues",
   "license": "MIT",
+  "privacy_policies": [
+    "https://github.com/rustcor-foundry/gitea-mcpb/blob/main/PRIVACY.md"
+  ],
   "keywords": [
     "gitea",
     "git",
